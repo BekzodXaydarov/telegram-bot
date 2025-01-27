@@ -7,63 +7,124 @@ const app = express()
 
 const bot = new telegraf.Telegraf(process.env.BOT_TOKEN)
 
+const progres = new Map()
+
+const rules = {
+    photo: `Rasmni nomini kiriting`,
+}
+
+
+
 bot.start(async (ctx) => {
-    await ctx.reply("hello enter your image name")
+    await ctx.reply("Salom BKbotga xush kelibsiz siz nima qidirishingizni tanlang \n Qidirishni o`zgartirish kerak bo`sa \n/change", {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: "Photo", callback_data: `step_photo` }],
+            ],
+            resize_keyboard: true
+        }
+    })
+})
+
+bot.command("change", async (ctx) => {
+    await ctx.reply('nima qidirishingizni tanlang', {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: "Photo", callback_data: `step_photo` }],
+            ],
+            resize_keyboard: true
+        }
+    })
 })
 
 bot.on("text", async (ctx) => {
-    const loading = await ctx.reply("loading")
-    try {
-        const { data } = await axios.get(process.env.BASE_URL + "/search?query=" + ctx.message.text, {
-            headers: {
-                Authorization: process.env.API_KEY
-            },
-        })
-        ctx.deleteMessage(loading.message_id)
-        const inlineKeyboard = []
-        for (let i = 0; i < data.photos.length; i+=2) {
-            const row = [
-                { text: `${i + 1}`, callback_data: `photo_${data.photos[i]?.id}` },
-            ];
-            if (data.photos[i + 1]) {
-                row.push({ text: `${i + 2}`, callback_data: `photo_${data.photos[i + 1]?.id}` });
+    const userId = ctx.from.id
+    const userData = progres.get(userId)
+    switch (userData?.step) {
+        case "photo":
+            const loading = await ctx.reply("Loading...")
+            try {
+                const { data } = await axios.get(process.env.BASE_URL + "/search?query=" + ctx.message.text, {
+                    headers: {
+                        Authorization: process.env.API_KEY
+                    },
+                })
+                await ctx.deleteMessage(loading.message_id)
+                const inlineKeyboard = []
+                for (let i = 0; i < data.photos.length; i += 4) {
+                    const row = [
+                        { text: `${i + 1}`, callback_data: `photo_${data.photos[i]?.id}` },
+                    ];
+                    if (data.photos[i + 1]) {
+                        row.push({ text: `${i + 2}`, callback_data: `photo_${data.photos[i + 1]?.id}` });
+                    }
+                    if (data.photos[i + 2]) {
+                        row.push({ text: `${i + 3}`, callback_data: `photo_${data.photos[i + 2]?.id}` });
+                    }
+                    if (data.photos[i + 3]) {
+                        row.push({ text: `${i + 4}`, callback_data: `photo_${data.photos[i + 3]?.id}` });
+                    }
+                    inlineKeyboard.push(row);
+                }
+                if (data.photos.length > 0) {
+                    await ctx.reply(data.photos.map((item, index) => `${index + 1}.${item?.alt} \nphotographer:${item?.photographer}\n\n`), {
+                        reply_markup: {
+                            inline_keyboard: inlineKeyboard,
+                            resize_keyboard: true,
+                        }
+                    })
+                } else {
+                    await ctx.reply("Hech qanday rasm topilmadi")
+                }
             }
+            catch (error) {
+                console.error(error)
+            }
+            break;
+        default:
+            break;
+    }
 
-            inlineKeyboard.push(row);
-        }
-        await ctx.reply("result")
-        await ctx.reply(data.photos.map((item, index) => `${index + 1}.${item.alt} \nphotographer:${item.photographer}\n\n`), {
-            reply_markup: {
-                inline_keyboard: inlineKeyboard,
-                resize_keyboard: true,
-            }
-        })
-    }
-    catch (error) {
-        console.error(error)
-    }
 })
 
 bot.on("callback_query", async (ctx) => {
     const callback_data = ctx.callbackQuery.data
+    const userId = ctx.from.id
+    // const chatId = ctx.chat.id;
     const [req, id] = callback_data.split("_")
     switch (req) {
-        case "photo":
-            const {data} = await axios.get(process.env.BASE_URL + "/photos/" + id,{
-                headers: {
-                    Authorization: process.env.API_KEY
-                },
-            })
-            await ctx.sendPhoto(data.src.original,{
-                caption:data.alt
-            })
+        case "step":
+            progres.set(userId, { step: id })
+            await ctx.reply(rules[id])
             break;
-
+        case "photo":
+            const loading = await ctx.reply("Loading...")
+            try {
+                const { data } = await axios.get(process.env.BASE_URL + "/photos/" + id, {
+                    headers: {
+                        Authorization: process.env.API_KEY
+                    },
+                })
+                await ctx.sendPhoto(data.src.original, {
+                    caption: `title:${data?.alt || "No title"} \n\nphotographer:${data?.photographer || "Unknow"}\n\nphotographer_url:${data?.photographer_url || "No URL available"}`,
+                })
+            }
+            catch (error) {
+                await ctx.reply("Error" || error)
+                console.error(error)
+            }
+            await ctx.deleteMessage(loading.message_id)
+            break;
+        case "remove":
+            // await ctx.deleteMessage(chatId,id)
+            break;
         default:
             break;
     }
     await ctx.answerCbQuery();
 })
+
+
 
 const PORT = process.env.PORT || 4299
 

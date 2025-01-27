@@ -12,7 +12,9 @@
     "axios": "^1.7.9",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "telegraf": "^4.16.3"
+    "miniget": "^4.2.3",
+    "telegraf": "^4.16.3",
+    "ytdl-core": "^4.11.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"
