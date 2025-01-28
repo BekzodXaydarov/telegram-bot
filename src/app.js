@@ -14,9 +14,8 @@ const rules = {
 }
 
 
-
 bot.start(async (ctx) => {
-    await ctx.reply("Salom BKbotga xush kelibsiz siz nima qidirishingizni tanlang \n Qidirishni o`zgartirish kerak bo`sa \n/change", {
+    await ctx.reply("Salom BKbotga xush kelibsiz siz nima qidirishingizni tanlang \n", {
         reply_markup: {
             inline_keyboard: [
                 [{ text: "Photo", callback_data: `step_photo` }],
@@ -44,7 +43,7 @@ bot.on("text", async (ctx) => {
         case "photo":
             const loading = await ctx.reply("Loading...")
             try {
-                const { data } = await axios.get(process.env.BASE_URL + "/search?query=" + ctx.message.text, {
+                const { data } = await axios.get(process.env.BASE_URL + "/v1/search?query=" + ctx.message.text, {
                     headers: {
                         Authorization: process.env.API_KEY
                     },
@@ -69,7 +68,7 @@ bot.on("text", async (ctx) => {
                 if (data.photos.length > 0) {
                     await ctx.reply(data.photos.map((item, index) => `${index + 1}.${item?.alt} \nphotographer:${item?.photographer}\n\n`), {
                         reply_markup: {
-                            inline_keyboard: inlineKeyboard,
+                            inline_keyboard: [...inlineKeyboard, [{ text: "✖", callback_data: "delete_message" }]],
                             resize_keyboard: true,
                         }
                     })
@@ -86,7 +85,14 @@ bot.on("text", async (ctx) => {
     }
 
 })
-
+bot.action('delete_message', async (ctx) => {
+    try {
+        await ctx.deleteMessage();
+        await ctx.answerCbQuery('Xabar o‘chirildi!');
+    } catch (error) {
+        console.error('Xatolik yuz berdi:', error);
+    }
+});
 bot.on("callback_query", async (ctx) => {
     const callback_data = ctx.callbackQuery.data
     const userId = ctx.from.id
@@ -100,13 +106,19 @@ bot.on("callback_query", async (ctx) => {
         case "photo":
             const loading = await ctx.reply("Loading...")
             try {
-                const { data } = await axios.get(process.env.BASE_URL + "/photos/" + id, {
+                const { data } = await axios.get(process.env.BASE_URL + "/v1/photos/" + id, {
                     headers: {
                         Authorization: process.env.API_KEY
                     },
                 })
+
                 await ctx.sendPhoto(data.src.original, {
                     caption: `title:${data?.alt || "No title"} \n\nphotographer:${data?.photographer || "Unknow"}\n\nphotographer_url:${data?.photographer_url || "No URL available"}`,
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: "✖", callback_data: "delete_message" }]
+                        ]
+                    }
                 })
             }
             catch (error) {
@@ -114,9 +126,6 @@ bot.on("callback_query", async (ctx) => {
                 console.error(error)
             }
             await ctx.deleteMessage(loading.message_id)
-            break;
-        case "remove":
-            // await ctx.deleteMessage(chatId,id)
             break;
         default:
             break;
